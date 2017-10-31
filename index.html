@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Co-working spaces</title>
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1,maximum-scale=1,user-scalable=no">
+
+  <!-- D3 -->
+  <script src="https://d3js.org/d3.v4.min.js"></script>
+
+  <script src="https://api.mapbox.com/mapbox-gl-js/v0.41.0/mapbox-gl.js"></script>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v0.41.0/mapbox-gl.css" rel="stylesheet" />
+
+  <!-- Mapbox Geocoder -->
+  <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v2.0.1/mapbox-gl-geocoder.js"></script>
+  <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v2.0.1/mapbox-gl-geocoder.css" type="text/css" />
+
+<style>
+#map {
+    width: 100%;
+    height: 100%;
+    position:absolute;
+}
+
+.mapboxgl-popup-content {
+    font-family: 'Arial', 'Helvetica', 'Open Sans', sans-serif;
+    background: white;
+    max-width: 140px;
+}
+
+.mapboxgl-popup h3 {
+    font-size: 22px;
+    margin: 0.5em 0;
+}
+
+
+</style>
+
+</head>
+
+<body>
+
+<div id="map"></div>
+
+<script>
+/*jshint esnext:true */
+mapboxgl.accessToken = 'pk.eyJ1IjoiZ2lzZmVlZGJhY2siLCJhIjoiY2l2eDJndmtjMDFkeTJvcHM4YTNheXZtNyJ9.-HNJNch_WwLIAifPgzW2Ig';
+
+var map = new mapboxgl.Map({
+    container: 'map', // container id
+    // or replace style. make sure it has a marker icon called 'marker1'
+    style: 'mapbox://styles/gisfeedback/cj8w4typvfwun2rs3ilv03s55?update=' + Math.random(),
+    center: [144.97, -37.85], 
+    zoom: 12 
+});
+
+var coworkingSpacesCsvUrl = 'https://gist.githubusercontent.com/stevage/41675738c0709dff151b5b4c6ec861f1/raw/99c02d5ff79efc60946350f5556cec35605cf6b9/coworkingtours.csv';
+
+d3.csv(coworkingSpacesCsvUrl, gotSource);
+
+function socrataPointToLatLon (point) {
+    var latlon = JSON.parse(point.replace('(', '[').replace(')', ']'));
+    return [latlon[1], latlon[0]]; // reverse order
+}
+
+function csvToGeoJSON(rows) {
+    return {
+        type: 'FeatureCollection',
+        features: rows.map(function(row) {
+            return {
+                type: 'Feature',
+                geometry: {
+                    type: 'Point',
+                    //coordinates: socrataPointToLatLon(row.location) // if using a single location field, from a geo dataset.
+                    coordinates: [+row.Longitude, +row.Latitude]
+                }, properties: row // copy all columns to properties, including Longitude and Latitude
+            };
+        })
+    };
+}
+
+function onLoad(cb) {
+    return map.loaded() ? cb() : map.on('load', cb);
+}
+
+function setCursor(cursor) {
+    map.getCanvas().style.cursor = cursor;
+}  
+
+function gotSource(rows) {
+    onLoad(function() {
+        map.addSource('spaces', { type: 'geojson', data: csvToGeoJSON(rows) });        
+        map.addLayer({
+            id: 'spaces-pins',
+            type: 'symbol',
+            source: 'spaces',
+            layout: {
+                'icon-image': 'marker1',
+                'icon-size': 0.3, // the svg markers are pretty huge.
+                'icon-padding': 0,
+                'icon-anchor': 'bottom' // so the marker actually points at the location
+            }
+        });
+
+        var popup = new mapboxgl.Popup({ closeButton: false, closeOnClick: false });
+
+        map.on('mouseenter', 'spaces-pins', function(e) { setCursor('pointer'); });
+        map.on('mouseleave', 'spaces-pins', function(e) { setCursor(''); })
+        map.on('click', function(e) {
+            var f = map.queryRenderedFeatures(e.point, { layers: [ 'spaces-pins' ] });
+            if (f && f[0]) {
+                var p = f[0].properties;
+                var description = 
+                    '<h3>' + p.Organisation + '</h3>' +
+                    p.Address;
+
+                popup.setLngLat(f[0].geometry.coordinates)
+                    .setHTML(description)
+                    .addTo(map);
+            } else {
+                popup.remove();
+            }
+        });
+    });
+}
+
+</script>
+</body>
+
+
+
+</html>
