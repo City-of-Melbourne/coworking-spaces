@@ -18,6 +18,9 @@
   <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v2.0.1/mapbox-gl-geocoder.css" type="text/css" />
 
 <style>
+body {
+    margin: 0;
+}
 #map {
     width: 100%;
     height: 100%;
@@ -52,11 +55,12 @@ var map = new mapboxgl.Map({
     container: 'map', // container id
     // or replace style. make sure it has a marker icon called 'marker1'
     style: 'mapbox://styles/gisfeedback/cj8w4typvfwun2rs3ilv03s55?update=' + Math.random(),
-    center: [144.97, -37.85], 
-    zoom: 12 
+    center: [144.96, -37.81], 
+    zoom: 12.9
 });
 
-var coworkingSpacesCsvUrl = 'https://gist.githubusercontent.com/stevage/41675738c0709dff151b5b4c6ec861f1/raw/99c02d5ff79efc60946350f5556cec35605cf6b9/coworkingtours.csv';
+var coworkingSpacesCsvUrl = 'https://data.melbourne.vic.gov.au/api/views/wcd7-bvh4/rows.csv?accessType=DOWNLOAD';
+//'https://gist.githubusercontent.com/stevage/41675738c0709dff151b5b4c6ec861f1/raw/99c02d5ff79efc60946350f5556cec35605cf6b9/coworkingtours.csv';
 
 d3.csv(coworkingSpacesCsvUrl, gotSource);
 
@@ -74,7 +78,7 @@ function csvToGeoJSON(rows) {
                 geometry: {
                     type: 'Point',
                     //coordinates: socrataPointToLatLon(row.location) // if using a single location field, from a geo dataset.
-                    coordinates: [+row.Longitude, +row.Latitude]
+                    coordinates: [+row.longitude, +row.latitude]
                 }, properties: row // copy all columns to properties, including Longitude and Latitude
             };
         })
@@ -98,8 +102,20 @@ function gotSource(rows) {
             source: 'spaces',
             layout: {
                 'icon-image': 'marker1',
-                'icon-size': 0.3, // the svg markers are pretty huge.
+                // the svg markers are pretty huge.
+                'icon-size': {
+                    stops: [
+                    [12, 0.15],
+                    [16, 0.3]
+                    ],
+                    base: 1.4
+                },
                 'icon-padding': 0,
+                'icon-allow-overlap': {
+                    stops: [
+                    [13, false],
+                    [14, true]
+                ]},
                 'icon-anchor': 'bottom' // so the marker actually points at the location
             }
         });
@@ -107,14 +123,15 @@ function gotSource(rows) {
         var popup = new mapboxgl.Popup({ closeButton: false, closeOnClick: false });
 
         map.on('mouseenter', 'spaces-pins', function(e) { setCursor('pointer'); });
-        map.on('mouseleave', 'spaces-pins', function(e) { setCursor(''); })
+        map.on('mouseleave', 'spaces-pins', function(e) { setCursor(''); });
         map.on('click', function(e) {
             var f = map.queryRenderedFeatures(e.point, { layers: [ 'spaces-pins' ] });
             if (f && f[0]) {
                 var p = f[0].properties;
                 var description = 
                     '<h3>' + p.Organisation + '</h3>' +
-                    p.Address;
+                    p.Address + '<br>' +
+                    (p.Website ? '<a target="_blank" href="' + ('http://' + p.Website).replace('http://http', 'http') + '">Website</a>':'');
 
                 popup.setLngLat(f[0].geometry.coordinates)
                     .setHTML(description)
